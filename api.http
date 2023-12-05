@@ -1,0 +1,9 @@
+@url=http://localhost:7000
+### 
+# Geting data 
+GET  {{url}}/data/users/10
+
+### 
+
+# Hllo from server 
+GET  {{url}}
