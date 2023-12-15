@@ -2,7 +2,7 @@ import axios from 'axios';
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import Env from '@fastify/env';
 import S from 'fluent-json-schema';
-
+const environmentsFolder = 'environments';
 export async function FastifyApp() {
 	const fastify = Fastify({
 		logger: {
@@ -14,8 +14,14 @@ export async function FastifyApp() {
 
 	await fastify.register(Env, {
 		dotenv: {
-			path: `${__dirname}/${
-				process.env.NODE_ENV === 'test' ? '.env.test' : '.env'
+			path: `${__dirname}/${environmentsFolder}/${
+				process.env.NODE_ENV === 'test'
+					? '.env.test'
+					: process.env.NODE_ENV === 'stage'
+					? '.env.stage'
+					: process.env.NODE_ENV === 'production'
+					? '.env.prod'
+					: '.env'
 			}`,
 		},
 		schema: S.object()
@@ -31,21 +37,16 @@ export async function FastifyApp() {
 		});
 	});
 
-	fastify.get('/data/:obj', async (req: FastifyRequest, rep: FastifyReply) => {
+	fastify.get('/data', async (req: FastifyRequest, rep: FastifyReply) => {
 		fastify.log.info('Getting data ...');
-		console.log(req.params);
 		try {
-			const { data } = await axios.get(
-				//@ts-ignore
-				`http://localhost:5200/${req.params.obj}`
-			);
-			return rep.code(200).send({
-				data,
-			});
+			const response = await axios.get('http://localhost:5200/users');
+			return rep.code(response.status).send(response.data);
 		} catch (e) {
-			fastify.log.error(e);
-			return rep.code(500).send({
-				error: 'Internal Server Error',
+			//@ts-ignore
+			return rep.code(e.response.status).send({
+				//@ts-ignore
+				error: e.message,
 			});
 		}
 	});

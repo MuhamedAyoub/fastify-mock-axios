@@ -1,100 +1,21 @@
+import axios from 'axios';
 import { FastifyApp } from '../main';
-import axios, { AxiosResponse } from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import tap from 'tap';
-/*
-Use Json server for testing incoming data from axios 
-replacing the env file while changing the node environment 
+import { FastifyInstance } from 'fastify';
 
-Check the package.json for more details 
+describe('fastify should start', () => {
+	const axiosUrl = 'http://localhost:5200/users';
+	let fastify: FastifyInstance;
+	beforeAll(async () => {
+		fastify = await FastifyApp();
 
-*/
-tap.test('Start testing .... ', async (t) => {
-	const fastify = await FastifyApp();
-	await fastify.listen();
-
-	t.test('Testing Success GET / path', async (t) => {
-		try {
-			// Testing your endpoints with inject
-			const response = await fastify.inject({
-				url: '/',
-				method: 'GET',
-			});
-			//! second solution
-			/* 
-			const response  = await fetch( "http://localhost:" +  fastify.server.address().port)
-
-
-			
-			*/
-			t.strictSame(response.statusCode, 200);
-			t.strictSame(
-				JSON.parse(response.body),
-				{
-					message: 'Hello World',
-				},
-				'Should return Hello World'
-			);
-		} catch (e) {
-			fastify.log.error('Error starting server:', e);
-		} finally {
-			t.end();
-		}
+		fastify.ready();
 	});
 
-	t.test('Testing Success GET /data path', async (t) => {
-		try {
-			const response = await fastify.inject({
-				url: '/data/users',
-				method: 'GET',
-			});
-			t.strictSame(response.statusCode, 200);
-			t.strictSame(
-				JSON.parse(response.body),
-				{
-					data: [
-						{
-							id: 1,
-							name: 'John',
-						},
-						{
-							id: 2,
-							name: 'Jane2',
-						},
-						{
-							id: 3,
-							name: 'Jane3',
-						},
-					],
-				},
-				'Should return data'
-			);
-			t.teardown(async () => await fastify.close());
-			t.end();
-		} catch (e) {
-			fastify.log.error('Error starting server:', e);
-		} finally {
-			t.end();
-		}
-	});
-	t.test('Testing Error GET /data path', async (t) => {
-		try {
-			const response = await fastify.inject({
-				url: '/data/nothing',
-				method: 'GET',
-			});
-			t.strictSame(response.statusCode, 500);
-			t.end();
-		} catch (e) {
-			fastify.log.error('Error starting server:', e);
-		} finally {
-			t.end();
-		}
-	});
-	t.test('Testing Axios ', async (t) => {
-		// Code 200
-		const mock = new MockAdapter(axios);
-		mock.onGet('/data/users').reply(200, {
+	const MockAxios = new MockAdapter(axios);
+	it('GET /data should return user data with status 200', async () => {
+		// Mock axios response
+		MockAxios.onGet(axiosUrl).reply(200, {
 			users: [
 				{
 					id: 1,
@@ -110,9 +31,14 @@ tap.test('Start testing .... ', async (t) => {
 				},
 			],
 		});
-		const response = await axios.get('/data/users');
-		t.strictSame(response.status, 200);
-		t.strictSame(response.data, {
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/data',
+		});
+
+		// Assertions
+		expect(response.statusCode).toBe(200);
+		expect(JSON.parse(response.body)).toEqual({
 			users: [
 				{
 					id: 1,
@@ -129,28 +55,36 @@ tap.test('Start testing .... ', async (t) => {
 			],
 		});
 	});
-	t.test('Testing Axios Error', async (t) => {
-		// Code 500
-		const mock = new MockAdapter(axios);
-		mock.onGet('/data/users').reply(500, {
-			error: 'Internal Server Error',
+	it('GET /data should handle API error with status 404', async () => {
+		MockAxios.onGet(axiosUrl).reply(404, {
+			status: 404,
+			data: {
+				message: 'User not found',
+			},
 		});
-		try {
-			const response = await axios.get('/data/users');
-		} catch (e: unknown) {
-			//@ts-ignore
-			t.strictSame(e.response.status, 500);
-		}
+		// Make the request
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/data',
+		});
+
+		expect(response.statusCode).toBe(404);
 	});
-	t.test('Testing Axios not found', async (t) => {
-		// Code 404
-		const mock = new MockAdapter(axios);
-		mock.onGet('/data/users').reply(404, {});
-		try {
-			const response = await axios.get('/data/users');
-		} catch (e) {
-			//@ts-ignore
-			t.strictSame(e.response.status, 404);
-		}
+	it('GET /data should handle network error', async () => {
+		// Mock axios network error
+		MockAxios.onGet(axiosUrl).reply(500, {
+			message: 'Network error',
+		});
+		// Make the request
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/data',
+		});
+		// Assertions
+		expect(response.statusCode).toBeGreaterThanOrEqual(500);
+	});
+
+	afterAll(async () => {
+		await fastify.close();
 	});
 });

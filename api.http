@@ -5,5 +5,5 @@ GET  {{url}}/data/users/10
 
 ### 
 
-# Hllo from server 
-GET  {{url}}
+# Get all data
+GET  {{url}}/data
